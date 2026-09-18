@@ -122,6 +122,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   });
 
+  // Calendário interativo (funciona 100% no Vercel, mobile e desktop)
+  const [isCustomDatePickerOpen, setIsCustomDatePickerOpen] = useState(false);
+  const [calendarViewDate, setCalendarViewDate] = useState(() => {
+    const parts = (defaultDate || new Date().toISOString().split('T')[0]).split('-');
+    return {
+      year: parseInt(parts[0], 10) || new Date().getFullYear(),
+      month: (parseInt(parts[1], 10) || (new Date().getMonth() + 1)) - 1
+    };
+  });
+
   // Mais detalhes state
   const [showMoreDetails, setShowMoreDetails] = useState<boolean>(false);
   const [repetitionMode, setRepetitionMode] = useState<'uma_vez' | 'parcela' | 'recorrente'>('uma_vez');
@@ -154,6 +164,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setIsCategoryPickerOpen(false);
       setCategorySearch('');
       setNewCategoryName('');
+      setIsCustomDatePickerOpen(false);
+      const initialDate = defaultDate || new Date().toISOString().split('T')[0];
+      const parts = initialDate.split('-');
+      setCalendarViewDate({
+        year: parseInt(parts[0], 10) || new Date().getFullYear(),
+        month: (parseInt(parts[1], 10) || (new Date().getMonth() + 1)) - 1
+      });
     }
   }, [defaultType, defaultDate, isOpen]);
 
@@ -314,7 +331,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 onClose();
                 onOpenReceiptScanner();
               }}
-              className="p-2 text-slate-500 hover:text-emerald-700 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer z-10 ml-auto"
+              className={`p-2 text-slate-500 rounded-xl transition-colors cursor-pointer z-10 ml-auto ${
+                type === 'expense'
+                  ? 'hover:text-rose-700 hover:bg-rose-50'
+                  : 'hover:text-emerald-700 hover:bg-emerald-50'
+              }`}
               title="Escanear conta ou cupom fiscal"
             >
               <ScanLine className="w-5 h-5" />
@@ -342,7 +363,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               aria-checked={isPaid}
               onClick={() => setIsPaid(!isPaid)}
               className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                isPaid ? 'bg-emerald-600' : 'bg-slate-300'
+                isPaid 
+                  ? type === 'expense' 
+                    ? 'bg-rose-600' 
+                    : type === 'investment' 
+                    ? 'bg-indigo-600' 
+                    : 'bg-emerald-600' 
+                  : 'bg-slate-300'
               }`}
               title={isPaid ? 'Marcar como pendente' : 'Marcar como concluído'}
             >
@@ -382,28 +409,32 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 {/* Clique no texto/ícone abre o calendário */}
                 <div 
                   onClick={() => {
-                    if (dateInputRef.current) {
-                      if ('showPicker' in HTMLInputElement.prototype) {
-                        try {
-                          dateInputRef.current.showPicker();
-                        } catch {
-                          dateInputRef.current.focus();
-                        }
-                      } else {
-                        dateInputRef.current.focus();
+                    const currentParts = (date || new Date().toISOString().split('T')[0]).split('-');
+                    setCalendarViewDate({
+                      year: parseInt(currentParts[0], 10) || new Date().getFullYear(),
+                      month: (parseInt(currentParts[1], 10) || (new Date().getMonth() + 1)) - 1
+                    });
+                    setIsCustomDatePickerOpen(true);
+                    if (dateInputRef.current && 'showPicker' in HTMLInputElement.prototype) {
+                      try {
+                        dateInputRef.current.showPicker();
+                      } catch {
+                        // fallback silencioso para o modal customizado
                       }
                     }
                   }}
                   className="flex items-center gap-2 cursor-pointer flex-1 py-0.5"
                   title="Clique para abrir o calendário"
                 >
-                  <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <Calendar className={`w-4 h-4 shrink-0 ${
+                    type === 'expense' ? 'text-rose-600' : type === 'investment' ? 'text-indigo-600' : 'text-emerald-600'
+                  }`} />
                   <span className="text-xs sm:text-sm font-bold text-slate-900 select-none">
                     {formatBRDisplayDate(date)}
                   </span>
                 </div>
 
-                {/* Input escondido para acionar o calendário nativo */}
+                {/* Input nativo invisível */}
                 <input
                   ref={dateInputRef}
                   type="date"
@@ -473,10 +504,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   e.stopPropagation();
                   setIsCategoryPickerOpen(true);
                 }}
-                className="p-1 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer ml-2"
+                className={`p-1 text-slate-500 rounded-lg transition-colors cursor-pointer ml-2 ${
+                  type === 'expense'
+                    ? 'hover:text-rose-700 hover:bg-rose-50'
+                    : 'hover:text-emerald-700 hover:bg-emerald-50'
+                }`}
                 title="Abrir categorias e adicionar categoria"
               >
-                <Plus className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+                <Plus className={`w-4 h-4 stroke-[2.5] ${
+                  type === 'expense' ? 'text-rose-600' : type === 'investment' ? 'text-indigo-600' : 'text-emerald-600'
+                }`} />
               </button>
             </div>
           </div>
@@ -702,8 +739,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               type="submit"
               id="btn-submit-new-transaction"
               className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 hover:scale-105 transition-all cursor-pointer ${
-                type === 'income'
-                  ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
+                type === 'expense'
+                  ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
                   : type === 'investment'
                   ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'
                   : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
@@ -726,7 +763,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             {/* Header do Picker de Categorias */}
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
-                <Tag className="w-4 h-4 text-emerald-600" />
+                <Tag className={`w-4 h-4 ${type === 'expense' ? 'text-rose-600' : 'text-emerald-600'}`} />
                 <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
                   Categorias
                 </h4>
@@ -741,8 +778,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             </div>
 
             {/* Criar nova categoria */}
-            <div className="p-4 border-b border-slate-100 bg-emerald-50/50 space-y-2">
-              <span className="text-xs font-extrabold text-emerald-900 block">
+            <div className={`p-4 border-b border-slate-100 space-y-2 ${type === 'expense' ? 'bg-rose-50/50' : 'bg-emerald-50/50'}`}>
+              <span className={`text-xs font-extrabold block ${type === 'expense' ? 'text-rose-900' : 'text-emerald-900'}`}>
                 Criar nova categoria
               </span>
               <div className="flex items-center gap-2">
@@ -757,13 +794,21 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                       handleSaveCustomCategory(newCategoryName);
                     }
                   }}
-                  className="flex-1 text-xs p-2 rounded-xl bg-white border border-emerald-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-medium"
+                  className={`flex-1 text-xs p-2 rounded-xl bg-white border font-medium focus:outline-hidden focus:ring-2 ${
+                    type === 'expense'
+                      ? 'border-rose-300 focus:ring-rose-500'
+                      : 'border-emerald-300 focus:ring-emerald-500'
+                  }`}
                 />
                 <button
                   type="button"
                   onClick={() => handleSaveCustomCategory(newCategoryName)}
                   disabled={!newCategoryName.trim()}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                  className={`px-3 py-2 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
+                    type === 'expense'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Criar</span>
@@ -810,7 +855,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                         }`}
                       >
                         <span className="truncate">{catName}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0 ml-1 text-emerald-400" />}
+                        {isSelected && (
+                          <Check className={`w-3.5 h-3.5 shrink-0 ml-1 ${type === 'expense' ? 'text-rose-400' : 'text-emerald-400'}`} />
+                        )}
                       </button>
                     );
                   })}
@@ -826,6 +873,142 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 className="px-4 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer"
               >
                 Concluir
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Calendário Direto (Totalmente compatível com Vercel, iOS, Android e Web) */}
+      {isCustomDatePickerOpen && (
+        <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col p-4 sm:p-5 animate-in zoom-in-95 duration-150">
+            
+            {/* Header do Calendário: Mês/Ano e setas para navegar */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setCalendarViewDate(prev => {
+                    const newMonth = prev.month - 1;
+                    if (newMonth < 0) {
+                      return { year: prev.year - 1, month: 11 };
+                    }
+                    return { year: prev.year, month: newMonth };
+                  });
+                }}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                title="Mês anterior"
+              >
+                <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+              </button>
+
+              <span className="font-extrabold text-slate-900 text-sm sm:text-base capitalize">
+                {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(
+                  new Date(calendarViewDate.year, calendarViewDate.month, 1)
+                )}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCalendarViewDate(prev => {
+                    const newMonth = prev.month + 1;
+                    if (newMonth > 11) {
+                      return { year: prev.year + 1, month: 0 };
+                    }
+                    return { year: prev.year, month: newMonth };
+                  });
+                }}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                title="Próximo mês"
+              >
+                <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Dias da semana */}
+            <div className="grid grid-cols-7 gap-1 text-center mb-2">
+              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((dayChar, i) => (
+                <span key={i} className="text-[11px] font-bold text-slate-400 py-1">
+                  {dayChar}
+                </span>
+              ))}
+            </div>
+
+            {/* Grade de dias */}
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {(() => {
+                const year = calendarViewDate.year;
+                const month = calendarViewDate.month;
+                const firstDayOfWeek = new Date(year, month, 1).getDay();
+                const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+                const cells = [];
+
+                // Células vazias antes do primeiro dia
+                for (let i = 0; i < firstDayOfWeek; i++) {
+                  cells.push(<div key={`empty-${i}`} className="h-9" />);
+                }
+
+                // Células dos dias do mês
+                for (let d = 1; d <= totalDaysInMonth; d++) {
+                  const mStr = String(month + 1).padStart(2, '0');
+                  const dStr = String(d).padStart(2, '0');
+                  const dateIso = `${year}-${mStr}-${dStr}`;
+                  const isSelected = date === dateIso;
+
+                  cells.push(
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => {
+                        setDate(dateIso);
+                        setIsCustomDatePickerOpen(false);
+                      }}
+                      className={`h-9 w-9 mx-auto rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer ${
+                        isSelected
+                          ? type === 'expense'
+                            ? 'bg-rose-600 text-white shadow-xs scale-105 font-black'
+                            : type === 'investment'
+                            ? 'bg-indigo-600 text-white shadow-xs scale-105 font-black'
+                            : 'bg-emerald-600 text-white shadow-xs scale-105 font-black'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  );
+                }
+
+                return cells;
+              })()}
+            </div>
+
+            {/* Footer com botão "Hoje" e fechar */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const todayIso = new Date().toISOString().split('T')[0];
+                  setDate(todayIso);
+                  setIsCustomDatePickerOpen(false);
+                }}
+                className={`text-xs font-bold transition-colors cursor-pointer ${
+                  type === 'expense'
+                    ? 'text-rose-600 hover:text-rose-700'
+                    : 'text-emerald-600 hover:text-emerald-700'
+                }`}
+              >
+                Hoje
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCustomDatePickerOpen(false)}
+                className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
 
